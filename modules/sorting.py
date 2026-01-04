@@ -8,11 +8,11 @@ from modules.convert import convert_heic_to_jpeg
 
 def get_earliest_date(file_path):
     try:
-        modified_time = os.path.getmtime(file_path)
-        try:
-            created_time = os.path.getctime(file_path)
-        except AttributeError:
-            created_time = modified_time
+        stat_info = os.stat(file_path)
+        modified_time = stat_info.st_mtime
+        created_time = getattr(stat_info, "st_birthtime", None)
+        if created_time is None:
+            created_time = stat_info.st_ctime
         earliest_time = min(modified_time, created_time)
         return datetime.fromtimestamp(earliest_time)
     except FileNotFoundError:
@@ -20,14 +20,23 @@ def get_earliest_date(file_path):
         return datetime.now()
 
 
-def process_and_assign_date(file_path):
-    file_name = os.path.basename(file_path)
+def extract_date_from_filename(file_name):
     try:
         date_part = file_name.split('_')[0]
-        extracted_date = datetime.strptime(date_part, "%Y%m%d")
+        return datetime.strptime(date_part, "%Y%m%d")
     except (ValueError, IndexError):
-        print(f"Unable to extract a valid date from the file name: {file_name}")
         return None
+
+
+def process_and_assign_date(file_path, allow_update=True):
+    file_name = os.path.basename(file_path)
+    extracted_date = extract_date_from_filename(file_name)
+    if not extracted_date:
+        if allow_update:
+            print(f"Unable to extract a valid date from the file name: {file_name}")
+        return None
+    if not allow_update:
+        return extracted_date
     try:
         mod_time = time.mktime(extracted_date.timetuple())
         os.utime(file_path, (mod_time, mod_time))
@@ -38,39 +47,64 @@ def process_and_assign_date(file_path):
         return None
 
 
-def get_destination_path(file_path, destination_directory):
+def get_destination_path(file_path, destination_directory, allow_update=True, dest_basename=None):
     earliest_time = get_earliest_date(file_path)
     if earliest_time.date() == datetime.now().date():
-        extracted_date = process_and_assign_date(file_path)
+        extracted_date = process_and_assign_date(file_path, allow_update=allow_update)
         if extracted_date:
             earliest_time = extracted_date
         else:
-            print(f"Using current date for sorting as no valid date was extracted: {file_path}")
+            if allow_update:
+                print(f"Using current date for sorting as no valid date was extracted: {file_path}")
             earliest_time = datetime.now()
     if earliest_time is None:
-        print(f"Skipping file due to missing date metadata: {file_path}")
+        if allow_update:
+            print(f"Skipping file due to missing date metadata: {file_path}")
         return None
 
     year_month_folder = earliest_time.strftime('%Y%m_%B')
     date_folder = earliest_time.strftime('%Y-%m-%d')
-    return os.path.join(destination_directory, "Images", year_month_folder, date_folder, os.path.basename(file_path))
+    file_name = dest_basename or os.path.basename(file_path)
+    return os.path.join(destination_directory, "Images", year_month_folder, date_folder, file_name)
 
 
 def image_sorting(source_directory, destination_directory, IMAGE_EXTENSIONS, dry_run=False, convertor=False):
     unsorted_folder = os.path.join(destination_directory, "Unsorted_Files")
     os.makedirs(unsorted_folder, exist_ok=True)
 
+    image_extensions = {ext.lower() for ext in IMAGE_EXTENSIONS}
+
     try:
-        total_files = sum(
-            1 for root, _, files in os.walk(source_directory)
-            for file in files if file.lower().endswith(tuple(IMAGE_EXTENSIONS))
-        )
+        total_files = 0
+        for root, _, files in os.walk(source_directory):
+            for file in files:
+                if file.startswith('.'):
+                    continue
+
+                src_path = os.path.join(root, file)
+                ext = os.path.splitext(file)[1].lower()
+
+                if ext in image_extensions:
+                    dest_basename = os.path.basename(file)
+                    if ext == ".heic" and convertor:
+                        dest_basename = os.path.splitext(dest_basename)[0] + ".jpg"
+                    dest_path = get_destination_path(
+                        src_path,
+                        destination_directory,
+                        allow_update=False,
+                        dest_basename=dest_basename,
+                    )
+                else:
+                    dest_path = os.path.join(unsorted_folder, ext[1:].upper(), file)
+
+                if dest_path and not os.path.exists(dest_path):
+                    total_files += 1
     except Exception as e:
         print(f"Error calculating total files: {e}")
         total_files = 0
 
     if total_files == 0:
-        print("No image files found to move.")
+        print("No new files found to move.")
         return
 
     with tqdm(total=total_files, desc="Organizing files") as progress_bar:
@@ -92,7 +126,7 @@ def image_sorting(source_directory, destination_directory, IMAGE_EXTENSIONS, dry
                         tqdm.write(f"Converted {os.path.basename(src_path)} to {converted_path}")
                         src_path = converted_path
 
-                    if ext in IMAGE_EXTENSIONS:
+                    if ext in image_extensions:
                         dest_path = get_destination_path(src_path, destination_directory)
                     else:
                         dest_path = os.path.join(unsorted_folder, ext[1:].upper(), file)
@@ -103,6 +137,7 @@ def image_sorting(source_directory, destination_directory, IMAGE_EXTENSIONS, dry
 
                     if dry_run:
                         tqdm.write(f"DRY RUN: Would copy {src_path} to {dest_path}")
+                        progress_bar.update(1)
                     else:
                         os.makedirs(os.path.dirname(dest_path), exist_ok=True)
                         shutil.copy2(src_path, dest_path)
