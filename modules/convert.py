@@ -1,49 +1,59 @@
-from pillow_heif import register_heif_opener  # type: ignore
-from PIL import Image, UnidentifiedImageError  # type: ignore
+import logging
 import os
+from pathlib import Path
+from typing import Optional
 
-# Register HEIF opener to handle HEIC format
+from PIL import Image, UnidentifiedImageError
+from pillow_heif import register_heif_opener
+
+from modules.config import config
+
 register_heif_opener()
+logger = logging.getLogger(__name__)
 
 
-def convert_heic_to_jpeg(src_path):
+def convert_heic_to_jpeg(
+    src_path: Path,
+    delete_original: bool = True
+) -> Optional[Path]:
     """
-    Convert a single HEIC file to JPEG format.
-    Deletes the original HEIC file after conversion.
+    Convert HEIC file to JPEG format.
 
     Args:
-        src_path (str): The full path of the HEIC file to convert.
+        src_path: Path to HEIC file
+        delete_original: Whether to delete the original file after conversion
 
     Returns:
-        str: The path of the converted JPEG file, or None if conversion failed.
+        Path to converted JPEG file, or None if conversion failed
     """
-    dest_path = os.path.splitext(src_path)[0] + ".jpg"
+    src_path = Path(src_path)
+    dest_path = src_path.with_suffix(".jpg")
 
-    if os.path.exists(dest_path):
-        print(f"JPEG already exists for {os.path.basename(src_path)}, skipping.")
-        return dest_path  # Return the path of the existing JPEG file
+    if dest_path.exists():
+        logger.info(f"JPEG already exists: {dest_path.name}")
+        return dest_path
 
     try:
-        # Retrieve original file metadata
-        original_mtime = os.path.getmtime(src_path)
-        original_ctime = os.path.getctime(src_path)
+        original_mtime = src_path.stat().st_mtime
 
-        # Open and convert the HEIC image to JPEG
         with Image.open(src_path) as img:
-            img.convert("RGB").save(dest_path, "JPEG")
-        print(f"Converted {os.path.basename(src_path)} to {dest_path}")
+            img.convert("RGB").save(dest_path, "JPEG", quality=config.JPEG_QUALITY)
 
-        # Set the metadata of the JPEG file to match the HEIC file
         os.utime(dest_path, (original_mtime, original_mtime))
+        logger.info(f"Converted {src_path.name} to JPEG")
 
-        # Delete the original HEIC file
-        os.remove(src_path)
-        print(f"Deleted original HEIC file: {os.path.basename(src_path)}")
-        return dest_path  # Return the path of the new JPEG file
+        if delete_original:
+            src_path.unlink()
+            logger.debug(f"Deleted original: {src_path.name}")
 
-    except UnidentifiedImageError:
-        print(f"Failed to convert {os.path.basename(src_path)}: File format not recognized or invalid HEIC file.")
+        return dest_path
+
+    except UnidentifiedImageError as e:
+        logger.error(f"Invalid HEIC file: {src_path.name}")
+        return None
+    except OSError as e:
+        logger.error(f"File operation failed for {src_path.name}: {e}")
+        return None
     except Exception as e:
-        print(f"Failed to convert {os.path.basename(src_path)}: {e}")
-
-    return None  # Return None if conversion failed
+        logger.exception(f"Unexpected error converting {src_path.name}")
+        return None
