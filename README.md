@@ -74,9 +74,11 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python test_photobook.py --demo demo/photos     # sample photos to play with
 ```
 
-Standalone app (no Python needed by the user; build on the system you build for):
+Standalone app, no Python needed by the user. Build on the system you build for:
 
 ```bash
-.venv/bin/pip install pyinstaller
-.venv/bin/pyinstaller --noconfirm --windowed --name Photobook photobook.py   # → dist/Photobook.app or dist/Photobook/
+make install       # Mac: dist/Photobook.app → /Applications, `photobook` command on PATH
+make install-win   # Windows (GNU make): dist\Photobook.exe → on PATH, start with Win+R → Photobook
 ```
+
+`make build` / `make build-win` only build, `make test` / `make test-win` run the tests.
