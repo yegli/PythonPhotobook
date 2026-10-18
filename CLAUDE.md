@@ -17,6 +17,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python photobook.py -s SRC -d DST [-c] [--dry-run]    # CLI
 .venv/bin/python test_photobook.py                              # tests (stdlib unittest)
 .venv/bin/python test_photobook.py --demo demo/photos           # sample library to play with
+make install                                                    # standalone binary -> ~/.local/bin/photobook
 ```
 
 ## Architecture
