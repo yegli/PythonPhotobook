@@ -293,6 +293,17 @@ class SortingTests(unittest.TestCase):
         self.assertEqual(result.copied + result.converted + result.kept_heic, 11)
 
 
+class TimeLeftTests(unittest.TestCase):
+    def test_time_left(self):
+        from modules.gui import time_left
+        self.assertEqual(time_left(1, 10, 100), "")                      # too early to guess
+        self.assertEqual(time_left(10, 2, 100), "")
+        self.assertEqual(time_left(10, 100, 100), "")                    # finished
+        self.assertEqual(time_left(10, 50, 100), " · less than a minute left")
+        self.assertEqual(time_left(60, 10, 110), " · about 10 min left")
+        self.assertEqual(time_left(60, 10, 1810), " · about 3.0 hours left")
+
+
 def make_demo(folder: Path, count: int = 400) -> None:
     """A playground: a few hundred colourful photos spread over two years, plus all the tricky cases."""
     make_sample(folder / "Tricky cases")

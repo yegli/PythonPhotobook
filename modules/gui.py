@@ -40,6 +40,18 @@ def save_settings(settings: dict) -> None:
         pass  # remembering folders is a convenience, never a reason to fail
 
 
+def time_left(seconds_so_far: float, done: int, total: int) -> str:
+    """' · about 5 min left', or '' while too early to guess."""
+    if done < 5 or seconds_so_far < 3 or done >= total:
+        return ""
+    left = seconds_so_far / done * (total - done)
+    if left < 60:
+        return " · less than a minute left"
+    if left < 90 * 60:
+        return f" · about {round(left / 60)} min left"
+    return f" · about {left / 3600:.1f} hours left"
+
+
 def open_folder(path: Path) -> None:
     if sys.platform == "darwin":
         subprocess.Popen(["open", path])
@@ -122,7 +134,8 @@ class App:
 
         self.bar = ttk.Progressbar(frame, mode="determinate")
         self.bar.grid(row=6, column=0, columnspan=3, sticky="ew", pady=(14, 4))
-        ttk.Label(frame, textvariable=self.status).grid(row=7, column=0, columnspan=3, sticky="w")
+        # width=1: long file names get cut off instead of widening the window
+        ttk.Label(frame, textvariable=self.status, width=1).grid(row=7, column=0, columnspan=3, sticky="ew")
 
         buttons = ttk.Frame(frame)
         buttons.grid(row=8, column=0, columnspan=3, sticky="e", pady=(12, 0))
@@ -215,11 +228,16 @@ class App:
 
     # Called from the worker thread: only put events on the queue, never touch widgets.
     def progress_scan(self, done: int, total: int, path: Path) -> None:
-        self.events.put(("progress", (done, total, f"Looking at {done:,} of {total:,}: {path.name}")))
-        self.maybe_thumbnail(path)
+        self.report("Looking at", done, total, path)
 
     def progress_sort(self, done: int, total: int, path: Path) -> None:
-        self.events.put(("progress", (done, total, f"Sorted {done:,} of {total:,}: {path.name}")))
+        self.report("Sorted", done, total, path)
+
+    def report(self, verb: str, done: int, total: int, path: Path) -> None:
+        if done == 1:  # clock starts at the first file, so listing the folders doesn't skew the guess
+            self.started = time.monotonic()
+        left = time_left(time.monotonic() - self.started, done, total)
+        self.events.put(("progress", (done, total, f"{verb} {done:,} of {total:,}{left}: {path.name}")))
         self.maybe_thumbnail(path)
 
     def maybe_thumbnail(self, path: Path) -> None:
