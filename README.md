@@ -1,154 +1,84 @@
-### File Organization Tool Guide
+# 📸 Photobook
 
-This document provides simple instructions for using the File Organization Tool to sort, convert, and validate image files.
+Photobook sorts your photos and videos into folders by the date they were taken:
 
----
+```
+Sorted photos/
+├── Images/
+│   ├── 202407_July/
+│   │   ├── 2024-07-14/
+│   │   │   ├── IMG_0001.jpg
+│   │   │   └── clip.mov
+│   │   └── 2024-07-15/
+│   └── 202501_January/
+├── Unsorted_Files/        ← everything that isn't a photo or video, by type
+│   └── PDF/
+└── Photobook_Logs/        ← a list of everything that was done
+```
 
-## **Features**
-1. **Organize Images**: Sort image files into date-based folders (e.g., `2023/January/01`).
-2. **Convert Formats**: Automatically convert `.heic` images to `.jpeg` if specified.
-3. **Integrity Check**: Validate the integrity of the organized files by ensuring file counts match.
-4. **Dry-Run**: Simulate the process without making actual changes to your files.
+**Your original files are never changed, moved or deleted.** Photobook only makes copies.
+Nothing in the destination is ever overwritten either.
 
----
+## Start
 
-## **Requirements**
+**Mac:** double-click `Photobook.command`.
+**Windows:** double-click `Photobook.bat`.
 
-### **Python Version**
-- Python 3.7 or newer.
+The first start sets things up and takes about a minute (it needs internet once).
+If it says Python is missing, install it from [python.org/downloads](https://www.python.org/downloads/)
+(on Windows tick **"Add python.exe to PATH"**) and double-click again.
 
-## **Installing Python**
+> Mac says the file "can't be opened"? Right-click it → **Open** → **Open**. Only needed once.
 
-### **Windows**
-1. **Download Python**
-   - Go to the [official Python website](https://www.python.org/downloads/).
-   - Download the latest version for Windows.
+## Use
 
-2. **Install Python**
-   - Run the downloaded installer.
-   - Ensure the **"Add Python to PATH"** checkbox is selected during installation.
-   - Choose **"Install Now"** for the default settings.
+1. **Photos to sort:** choose the folder with your photos, e.g. a phone backup, a USB stick or an SD card.
+2. **Save sorted photos to:** choose where the sorted photos should go (it can already contain photos).
+3. Click **Preview**. You'll see how many photos will be sorted, how much space it needs, and some fun facts.
+   Nothing is copied yet.
+4. Click **Start sorting**. You can cancel at any time.
 
-3. **Verify Installation**
-   - Open Command Prompt (`Win + R`, type `cmd`, and press Enter).
-   - Run:
-     ```bash
-     python --version
-     ```
-   - You should see the installed Python version.
+Run it again whenever you have new photos. Photos that are already there are recognised and skipped,
+even if you moved them to another folder in the meantime.
 
-4. **Install Pip**
-   - Pip is included by default in modern Python versions. Verify it with:
-     ```bash
-     pip --version
-     ```
+## Good to know
 
-### **macOS**
-1. **Download Python**
-   - Visit the [official Python website](https://www.python.org/downloads/).
-   - Download the macOS version.
+- **Dates** come from the photo itself (the camera's "date taken"), then from the video, then from names like
+  `IMG_20250120_…` or `Screenshot 2025-01-20…`, and only as a last resort from the file date.
+  The preview tells you how many files had to fall back to the file date.
+- **iPhone photos (HEIC)** can be converted to JPG so they open on any computer and printing service.
+  Date, location and colours are kept. If a photo can't be converted, the original is copied instead.
+- **Same name, different photo** (e.g. two phones both have `IMG_0001.jpg`): both are kept, the second one
+  becomes `IMG_0001 (2).jpg`.
+- **Exact duplicates** in the photo folder are copied only once.
+- **Not enough space?** Photobook checks before it starts. If the drive fills up anyway, it stops cleanly
+  without leaving broken files behind. Free up space and run again; it continues where it stopped.
+- Hidden files and system clutter (`.DS_Store`, `Thumbs.db`, …) are skipped. In an Apple Photos library,
+  only the original photos are taken, not the thumbnails.
 
-2. **Install Python**
-   - Open the downloaded `.pkg` file and follow the on-screen instructions.
+## For the command line
 
-3. **Verify Installation**
-   - Open Terminal (`Cmd + Space`, type `Terminal`, and press Enter).
-   - Run:
-     ```bash
-     python3 --version
-     ```
-   - macOS uses `python3` instead of `python`.
-
-4. **Install Pip**
-   - Pip is included by default. Verify it with:
-     ```bash
-     pip3 --version
-     ```
----
-
-### **Python Packages**
-The tool depends on the following Python libraries:
-- `pillow_heif`
-- `Pillow`
-- `tqdm`
-
-You can install these dependencies using:
 ```bash
-pip install -r requirements.txt
+python photobook.py                                       # opens the window
+python photobook.py -s ~/Pictures/Phone -d ~/Sorted --dry-run    # only show what would happen
+python photobook.py -s ~/Pictures/Phone -d ~/Sorted -c           # sort, converting HEIC to JPG
 ```
 
----
+`--dry-run` (or `-i`) also works as a check: it lists anything from the source that isn't in the destination yet.
 
-## **Usage**
+## For developers
 
-### **Running the Tool**
-Run the script using the terminal:
 ```bash
-python photobook.py -s <source_directory> -d <destination_directory> [options]
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/python test_photobook.py                        # safety tests
+.venv/bin/python test_photobook.py --demo demo/photos     # sample photos to play with
 ```
 
-### **Options**
-| **Option**           | **Description**                                                                                      |
-|-----------------------|------------------------------------------------------------------------------------------------------|
-| `-s`, `--source`      | Source directory containing files to organize. **(Required)**                                       |
-| `-d`, `--destination` | Destination directory to store organized files. **(Required)**                                      |
-| `--dry-run`           | Simulate the organization process without actually moving or copying files.                         |
-| `-c`, `--convert`     | Convert `.heic` files to `.jpeg` before sorting.                                                    |
-| `--log-to-file`       | Log operations to a file in the destination directory.                                              |
-| `-i`, `--integrity-check` | Check if the source and destination directories have matching file counts after processing. |
+Standalone app, no Python needed by the user. Build on the system you build for:
 
----
-
-## **Examples**
-
-### **Basic Sorting**
 ```bash
-python photobook.py -s /path/to/source -d /path/to/destination
+make install       # Mac: dist/Photobook.app → /Applications, `photobook` command on PATH
+make install-win   # Windows (GNU make): dist\Photobook.exe → on PATH, start with Win+R → Photobook
 ```
 
-### **Sorting with Conversion**
-```bash
-python photobook.py -s /path/to/source -d /path/to/destination -c
-```
-
-### **Dry-Run Mode**
-```bash
-python photobook.py -s /path/to/source -d /path/to/destination --dry-run
-```
-
-### **With Integrity Check**
-```bash
-python photobook.py -s /path/to/source -d /path/to/destination -i
-```
-
----
-
-## **Output Structure**
-Organized files will be saved in a structured format:
-```
-/destination_directory
-└── Images
-    ├── 2023_January
-    │   └── 2023-01-01
-    │       ├── image1.jpg
-    │       └── image2.png
-    └── Unsorted_Files
-        └── <File Type>
-            └── unsorted_file1.ext
-```
-
----
-
-## **Error Handling**
-
-- **Invalid Paths**: If a source or destination directory is missing, the tool will alert you and halt execution.
-- **File Count Mismatch**: During integrity checks, the tool stops processing if the source and destination counts do not match.
-- **HEIC Conversion Failure**: If a `.heic` file fails to convert, it will remain in the unsorted folder.
-
----
-
-## **Additional Resources**
-- [Python Documentation](https://docs.python.org/3/)
-- [Installing Python on Windows](https://docs.python.org/3/using/windows.html)
-- [Installing Python on macOS](https://docs.python.org/3/using/mac.html)
-- [Virtual Environments Guide](https://docs.python.org/3/tutorial/venv.html)
+`make build` / `make build-win` only build, `make test` / `make test-win` run the tests.
